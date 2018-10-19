@@ -15,7 +15,6 @@ sb = StandardSkillBuilder(
         table_name='interview_me_users',
         auto_create_table=True,
         )
-help_text = """Please tell me a topic. I will ask a question from that topic."""
 skill_name = "Interview Me"
 NOTIFY_MISSING_PERMISSIONS = """
 Please enable email permissions in the Amazon Alexa app.
@@ -36,9 +35,6 @@ class LaunchRequestHandler(AbstractRequestHandler):
 
          handler_input.response_builder.speak(
                 speech_text
-            )
-         handler_input.response_builder.ask(
-                help_text
             )
          handler_input.response_builder.set_should_end_session(
                 False
@@ -85,6 +81,8 @@ class TopicIntentHandler(AbstractRequestHandler):
             ).set_should_end_session(
                 False
             )
+        rprompt = {"outputSpeech":handler_input.response_builder.response.output_speech}
+        handler_input.response_builder.response.reprompt = rprompt
         return handler_input.response_builder.response
 
 class EmailIntentHandler(AbstractRequestHandler):
@@ -102,6 +100,8 @@ class EmailIntentHandler(AbstractRequestHandler):
         if not (req_envelope.context.system.user.permissions and
                 req_envelope.context.system.user.permissions.consent_token):
             handler_input.response_builder.speak(NOTIFY_MISSING_PERMISSIONS)
+            rprompt = {"outputSpeech":handler_input.response_builder.response.output_speech}
+            handler_input.response_builder.response.reprompt = rprompt
             handler_input.response_builder.set_card(
                 AskForPermissionsConsentCard(permissions=permissions)
                 )
@@ -127,7 +127,14 @@ class EmailIntentHandler(AbstractRequestHandler):
                     False
                 )
         except Exception as e:
-            raise e
+            speech_text = "Tell me a topic first. For example, queue"
+            handler_input.response_builder.speak(
+                    speech_text
+                ).set_should_end_session(
+                    False
+                )
+            rprompt = {"outputSpeech":handler_input.response_builder.response.output_speech}
+            handler_input.response_builder.response.reprompt = rprompt
 
         return handler_input.response_builder.response
 
