@@ -9,6 +9,8 @@ from ask_sdk_model.services import ServiceException
 
 from auxilary import get_a_question, send_email
 
+import requests
+
 sb = StandardSkillBuilder(
         table_name='interview_me_users',
         auto_create_table=True,
@@ -68,6 +70,7 @@ class TopicIntentHandler(AbstractRequestHandler):
         if not cur_question:
             speech_text = "Sorry, I don't have any more questions on {}. Try another topic ?".format(requested_topic)
         else:
+            cur_question['problem'].replace('&', 'and')
             session_attrs['cur_q'] = cur_question
             speech_text = cur_question['title'] + "\n" + cur_question['problem']
             if perma_attrs.get('done'):
@@ -91,9 +94,9 @@ class EmailIntentHandler(AbstractRequestHandler):
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
         attrib_manager = handler_input.attributes_manager
-        svcf = handler_input.service_client_factory.get_ups_service()
         req_envelope = handler_input.request_envelope
         session_attrs = attrib_manager.session_attributes
+        intent_context = req_envelope.context.system
 
         if not (req_envelope.context.system.user.permissions and
                 req_envelope.context.system.user.permissions.consent_token):
@@ -103,19 +106,25 @@ class EmailIntentHandler(AbstractRequestHandler):
                 )
             return handler_input.response_builder.response
         try:
-            to_email = svcf.get_profile_email()
-            print(to_email)
+            uri = intent_context.api_endpoint
+            api_access = intent_context.api_access_token
+            geter = "/v2/accounts/~current/settings/Profile.email"
+            headers = {
+                'Content-type': 'application/json',
+                'Authorization': 'Bearer {}'.format(api_access),
+            }
+            x = requests.get(uri+geter, headers=headers)
+            to_email = x.text
+            print(x)
+            # print(to_email)
             send_email(to_email, session_attrs['cur_q'])
             speech_text = "Your email is on the way. It will reach you at {}".format(to_email)
 
             handler_input.response_builder.speak(
                     speech_text
                 ).set_should_end_session(
-                    True
+                    False
                 )
-        except ServiceException:
-            handler_input.response_builder.speak(ERROR)
-            return response_builder.response
         except Exception as e:
             raise e
 
