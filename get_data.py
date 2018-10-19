@@ -78,6 +78,7 @@ class TopicIntentHandler(AbstractRequestHandler):
             else:
                 perma_attrs['done'] = [cur_question['qlink']]
             attrib_manager.save_persistent_attributes()
+            attrib_manager.session_attributes = session_attrs
 
         handler_input.response_builder.speak(
                 speech_text
