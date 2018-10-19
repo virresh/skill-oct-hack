@@ -70,7 +70,7 @@ class TopicIntentHandler(AbstractRequestHandler):
         if not cur_question:
             speech_text = "Sorry, I don't have any more questions on {}. Try another topic ?".format(requested_topic)
         else:
-            cur_question['problem'].replace('&', 'and')
+            cur_question['problem'] = cur_question['problem'].replace('&', 'and')
             session_attrs['cur_q'] = cur_question
             speech_text = cur_question['title'] + "\n" + cur_question['problem']
             if perma_attrs.get('done'):
