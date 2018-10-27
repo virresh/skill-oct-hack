@@ -24,6 +24,8 @@ Something wen't bad. Please try again in a while.
 """
 permissions = ["alexa::profile:email:read"]
 
+CONTINUE_QUESTION = "What would you like to do next ? I can email this question to you, or you can tell me another topic to ask question from ?"
+
 class LaunchRequestHandler(AbstractRequestHandler):
      def can_handle(self, handler_input):
          # type: (HandlerInput) -> bool
@@ -35,7 +37,7 @@ class LaunchRequestHandler(AbstractRequestHandler):
 
          handler_input.response_builder.speak(
                 speech_text
-            )
+            ).ask(skill_name)
          handler_input.response_builder.set_should_end_session(
                 False
             )
@@ -68,7 +70,7 @@ class TopicIntentHandler(AbstractRequestHandler):
         else:
             cur_question['problem'] = cur_question['problem'].replace('&', 'and')
             session_attrs['cur_q'] = cur_question
-            speech_text = cur_question['title'] + "\n" + cur_question['problem']
+            speech_text = cur_question['title'] + "\n" + cur_question['problem'] + "\n" + CONTINUE_QUESTION
             if perma_attrs.get('done'):
                 perma_attrs['done'].append(cur_question['qlink'])
             else:
@@ -78,6 +80,8 @@ class TopicIntentHandler(AbstractRequestHandler):
 
         handler_input.response_builder.speak(
                 speech_text
+            ).ask(
+                CONTINUE_QUESTION
             ).set_should_end_session(
                 False
             )
@@ -99,9 +103,7 @@ class EmailIntentHandler(AbstractRequestHandler):
 
         if not (req_envelope.context.system.user.permissions and
                 req_envelope.context.system.user.permissions.consent_token):
-            handler_input.response_builder.speak(NOTIFY_MISSING_PERMISSIONS)
-            rprompt = {"outputSpeech":handler_input.response_builder.response.output_speech}
-            handler_input.response_builder.response.reprompt = rprompt
+            handler_input.response_builder.speak(NOTIFY_MISSING_PERMISSIONS).ask(CONTINUE_QUESTION)
             handler_input.response_builder.set_card(
                 AskForPermissionsConsentCard(permissions=permissions)
                 )
@@ -119,10 +121,12 @@ class EmailIntentHandler(AbstractRequestHandler):
             print(x)
             # print(to_email)
             send_email(to_email, session_attrs['cur_q'])
-            speech_text = "Your email is on the way. It will reach you at {}".format(to_email)
+            speech_text = "Your email is on the way. It will reach you at {}".format(to_email) + CONTINUE_QUESTION
 
             handler_input.response_builder.speak(
                     speech_text
+                ).ask(
+                    CONTINUE_QUESTION
                 ).set_should_end_session(
                     False
                 )
@@ -130,11 +134,42 @@ class EmailIntentHandler(AbstractRequestHandler):
             speech_text = "Tell me a topic first. For example, queue"
             handler_input.response_builder.speak(
                     speech_text
+                ).ask(
+                    CONTINUE_QUESTION
                 ).set_should_end_session(
                     False
                 )
-            rprompt = {"outputSpeech":handler_input.response_builder.response.output_speech}
-            handler_input.response_builder.response.reprompt = rprompt
+
+        return handler_input.response_builder.response
+
+class RepromptIntentHandler(AbstractRequestHandler):
+    def can_handle(self, handler_input):
+        return is_intent_name("RePromptIntent")(handler_input)
+
+    def handle(self, handler_input):
+        attrib_manager = handler_input.attributes_manager
+        req_envelope = handler_input.request_envelope
+        session_attrs = attrib_manager.session_attributes
+
+        if session_attrs.get('cur_q'):
+            cur_question = session_attrs.get('cur_q')
+            speech_text = cur_question['title'] + "\n" + cur_question['problem'] + "\n" + CONTINUE_QUESTION
+            handler_input.response_builder.speak(
+                    speech_text
+                ).ask(
+                    CONTINUE_QUESTION
+                ).set_should_end_session(
+                    False
+                )
+        else:
+            handler_input.response_builder.speak(
+                    "You can tell me a topic and I'll ask you questions from that !"
+                    "For example, I can ask you about heaps, queues, trees etc"
+                ).ask(
+                    CONTINUE_QUESTION
+                ).set_should_end_session(
+                    False
+                )
 
         return handler_input.response_builder.response
 
@@ -161,7 +196,7 @@ class CancelAndStopIntentHandler(AbstractRequestHandler):
         # type: (HandlerInput) -> Response
         speech_text = "Goodbye!"
 
-        handler_input.response_builder.speak(speech_text)
+        handler_input.response_builder.speak(speech_text).set_should_end_session(True)
         return handler_input.response_builder.response
 
 class SessionEndedRequestHandler(AbstractRequestHandler):
@@ -187,12 +222,13 @@ class AllExceptionHandler(AbstractExceptionHandler):
         print(exception)
 
         speech = "Sorry, I didn't get it. Can you please say it again!!"
-        handler_input.response_builder.speak(speech).ask(speech)
+        handler_input.response_builder.speak(speech).ask(CONTINUE_QUESTION)
         return handler_input.response_builder.response
 
 sb.add_request_handler(LaunchRequestHandler())
 sb.add_request_handler(TopicIntentHandler())
 sb.add_request_handler(EmailIntentHandler())
+sb.add_request_handler(RepromptIntentHandler())
 sb.add_request_handler(HelpIntentHandler())
 sb.add_request_handler(CancelAndStopIntentHandler())
 sb.add_request_handler(SessionEndedRequestHandler())
